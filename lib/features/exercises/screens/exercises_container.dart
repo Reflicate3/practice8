@@ -1,45 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../models/exercise.dart';
-import '../data/exercises_seed.dart';
+import '../data/exercises_scope.dart';
 
 import 'exercises_list_screen.dart';
+import 'add_exercise_screen.dart';
 import 'exercise_detail_screen.dart';
 import 'favorites_screen.dart';
 import 'about_screen.dart';
 import 'gallery_screen.dart';
-import 'add_exercise_screen.dart';
-import '/features/exercises/navigation_args.dart';
+import '../widgets/scope_badge.dart';
 
 class ExercisesContainer extends StatefulWidget {
-
-  final List<Exercise>? initial;
-
-  const ExercisesContainer({super.key, this.initial});
+  const ExercisesContainer({super.key});
 
   @override
   State<ExercisesContainer> createState() => _ExercisesContainerState();
 }
 
 class _ExercisesContainerState extends State<ExercisesContainer> {
-  late List<Exercise> _all;
-
-  String _query = '';
+  String _q = '';
   final Set<Difficulty> _diff = {};
   final Set<Equipment> _equip = {};
   MuscleGroup? _muscle;
+  bool _filtersExpanded = false;
 
-  // UI
-  bool _filtersExpanded = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _all = List<Exercise>.from(widget.initial ?? seedExercises);
-  }
-
-  String get _q => _query.trim().toLowerCase();
+  List<Exercise> get _all => ExercisesScope.of(context).all;
 
   List<Exercise> get _visible {
     return _all.where((e) {
@@ -54,102 +40,94 @@ class _ExercisesContainerState extends State<ExercisesContainer> {
   }
 
   void _openDetailById(String id) {
-    final ex = _all.firstWhere((e) => e.id == id);
-    context.push(
-      '/detail/$id',
-      extra: ExerciseDetailArgs(
-        item: ex,
-        onToggleFavorite: () => _toggleFavoriteById(ex.id),
+    final ex = ExercisesScope.read(context).byId(id);
+    if (ex == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ExerciseDetailScreen(item: ex),
       ),
     );
   }
 
   void _openAdd() {
-    context.push(
-      '/add',
-      extra: AddExerciseArgs(
-        onSave: ({
-          required String title,
-          required String description,
-          required MuscleGroup muscle,
-          required Equipment equipment,
-          required Difficulty difficulty,
-        }) {
-          final updated = List<Exercise>.from(_all)
-            ..add(
-              Exercise(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                title: title,
-                description: description,
-                muscle: muscle,
-                equipment: equipment,
-                difficulty: difficulty,
-                isFavorite: false,
-                createdAt: DateTime.now(),
-              ),
-            );
-
-          context.pushReplacement('/', extra: updated);
-        },
-      ),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AddExerciseScreen()),
     );
   }
 
   void _openFavorites() {
-    final favs = _all.where((e) => e.isFavorite).toList();
-    context.push(
-      '/favorites',
-      extra: FavoritesArgs(
-        items: favs,
-        onDelete: (id) => setState(() => _all.removeWhere((e) => e.id == id)),
-        onToggleFavorite: _toggleFavoriteById,
-        onOpenDetail: _openDetailById,
-      ),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const FavoritesScreen()),
     );
   }
-  void _openAbout() => context.push('/about');
 
-  void _openGallery() => context.push('/gallery');
+  void _openAbout() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AboutScreen()),
+    );
+  }
 
-  void _toggleFavoriteById(String id) {
-    final i = _all.indexWhere((e) => e.id == id);
-    if (i != -1) {
-      setState(() {
-        _all[i] = _all[i].copyWith(isFavorite: !_all[i].isFavorite);
-      });
-    }
+  void _openGallery() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const GalleryScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ExercisesListScreen(
-        items: _visible,
-        query: _query,
-        selectedDifficulties: _diff,
-        selectedEquipment: _equip,
-        selectedMuscle: _muscle,
-        onSearch: (v) => setState(() => _query = v),
-        onToggleDifficulty: (d) => setState(() => _diff.toggle(d)),
-        onToggleEquipment: (e) => setState(() => _equip.toggle(e)),
-        onSelectMuscle: (m) => setState(() => _muscle = m),
+      body: Stack(
+        children: [
+          ExercisesListScreen(
+            items: _visible,
+            query: _q,
+            selectedDifficulties: _diff,
+            selectedEquipment: _equip,
+            selectedMuscle: _muscle,
+            onSearch: (q) => setState(() => _q = q.trim().toLowerCase()),
+            onToggleDifficulty: (d) => setState(() => _diff.toggle(d)),
+            onToggleEquipment: (e) => setState(() => _equip.toggle(e)),
+            onSelectMuscle: (m) => setState(() => _muscle = m),
+            onAddTap: _openAdd,
+            onDelete: (id) => ExercisesScope.read(context).remove(id),
+            onToggleFavorite: (id) =>
+                ExercisesScope.read(context).toggleFavorite(id),
+            onOpenDetail: _openDetailById,
+            filtersExpanded: _filtersExpanded,
+            onToggleFilters: () =>
+                setState(() => _filtersExpanded = !_filtersExpanded),
+            onOpenFavorites: _openFavorites,
+            onOpenAbout: _openAbout,
+            onOpenGallery: _openGallery,
+          ),
 
-        onAddTap: _openAdd,
-        onDelete: (id) => setState(() => _all.removeWhere((e) => e.id == id)),
-        onToggleFavorite: _toggleFavoriteById,
-        onOpenDetail: _openDetailById,
-
-        filtersExpanded: _filtersExpanded,
-        onToggleFilters: () => setState(() => _filtersExpanded = !_filtersExpanded),
-
-        onOpenFavorites: _openFavorites, // push (вертикально)
-        onOpenAbout: _openAbout,         // push (вертикально)
-        onOpenGallery: _openGallery,     // push (вертикально)
+          // Мини-бейдж по центру сверху. Не перехватывает клики.
+          IgnorePointer(
+            ignoring: true,
+            child: SafeArea(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: const ScopeTinyBadge(),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-extension _ToggleSet<T> on Set<T> {
-  void toggle(T v) => contains(v) ? remove(v) : add(v);
+// --- helpers ---------------------------------------------------------------
+
+extension SetToggleExt<T> on Set<T> {
+  void toggle(T value) {
+    if (contains(value)) {
+      remove(value);
+    } else {
+      add(value);
+    }
+  }
 }

@@ -1,84 +1,52 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../models/exercise.dart';
 import '../widgets/exercise_card.dart';
+import '../data/exercises_scope.dart';
+import 'exercise_detail_screen.dart';
 
 class FavoritesScreen extends StatelessWidget {
-  final List<Exercise> items;
-  final ValueChanged<String> onDelete;
-  final ValueChanged<String> onToggleFavorite;
-  final ValueChanged<String> onOpenDetail;
-
-  const FavoritesScreen({
-    super.key,
-    required this.items,
-    required this.onDelete,
-    required this.onToggleFavorite,
-    required this.onOpenDetail,
-  });
+  const FavoritesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final repo = ExercisesScope.of(context);
+    final items = repo.all.where((e) => e.isFavorite).toList();
+
     return Scaffold(
       appBar: AppBar(
-        leading: BackButton(onPressed: () => context.pop()),
         title: const Text('Избранные упражнения'),
       ),
       body: items.isEmpty
           ? const _EmptyFavs()
-          : _List(
-        items: items,
-        onDelete: onDelete,
-        onToggleFavorite: onToggleFavorite,
-        onOpenDetail: onOpenDetail,
+          : ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final ex = items[index];
+          return Dismissible(
+            key: ValueKey('fav_${ex.id}'),
+            background: Container(
+              color: Colors.red,
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: const Icon(Icons.delete, color: Colors.white),
+            ),
+            direction: DismissDirection.endToStart,
+            onDismissed: (_) => ExercisesScope.read(context).remove(ex.id),
+            child: ExerciseCard(
+              item: ex,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ExerciseDetailScreen(item: ex),
+                ),
+              ),
+              onToggleFavorite: () =>
+                  ExercisesScope.read(context).toggleFavorite(ex.id),
+            ),
+          );
+        },
       ),
-    );
-  }
-}
-
-class _List extends StatelessWidget {
-  final List<Exercise> items;
-  final ValueChanged<String> onDelete;
-  final ValueChanged<String> onToggleFavorite;
-  final ValueChanged<String> onOpenDetail;
-
-  const _List({
-    required this.items,
-    required this.onDelete,
-    required this.onToggleFavorite,
-    required this.onOpenDetail,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemBuilder: (context, i) {
-        final item = items[i];
-        return Dismissible(
-          key: ValueKey('fav_${item.id}'),
-          background: Container(
-            color: Theme.of(context).colorScheme.errorContainer,
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: const Icon(Icons.delete),
-          ),
-          secondaryBackground: Container(
-            color: Theme.of(context).colorScheme.errorContainer,
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: const Icon(Icons.delete),
-          ),
-          onDismissed: (_) => onDelete(item.id),
-          child: ExerciseCard(
-            item: item,
-            onTap: () => onOpenDetail(item.id),
-            onToggleFavorite: () => onToggleFavorite(item.id),
-          ),
-        );
-      },
-      separatorBuilder: (_, __) => const SizedBox(height: 4),
-      itemCount: items.length,
     );
   }
 }
@@ -88,20 +56,10 @@ class _EmptyFavs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.favorite_border, size: 56),
-            const SizedBox(height: 8),
-            Text('Пока пусто',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            const Text('Добавьте упражнения в избранное со списка.'),
-          ],
-        ),
+        padding: EdgeInsets.all(24),
+        child: Text('Пока пусто. Отмечайте упражнения сердечком.'),
       ),
     );
   }
