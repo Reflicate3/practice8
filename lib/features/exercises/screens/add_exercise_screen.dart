@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
+
 import '../models/exercise.dart';
-import '../data/exercises_scope.dart';
+import '../data/exercises_repository.dart';
 
 class AddExerciseScreen extends StatefulWidget {
   const AddExerciseScreen({super.key});
@@ -27,7 +29,7 @@ class _AddExerciseScreenState extends State<AddExerciseScreen> {
 
   void _save() {
     if (_formKey.currentState?.validate() != true) return;
-    ExercisesScope.read(context).add(
+    GetIt.I<ExercisesRepository>().add(
       title: _title.text.trim(),
       description: _desc.text.trim(),
       muscle: _muscle,
@@ -133,7 +135,7 @@ class _AddExerciseScreenState extends State<AddExerciseScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Данные сохраняются в репозитории через InheritedWidget.',
+              'Сохранение выполняется через GetIt → ExercisesRepository.add().',
               style: theme.textTheme.bodySmall,
             ),
           ],

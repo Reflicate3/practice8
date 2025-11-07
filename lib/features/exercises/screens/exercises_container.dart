@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 
 import '../models/exercise.dart';
-import '../data/exercises_scope.dart';
+import '../data/exercises_repository.dart';
 
 import 'exercises_list_screen.dart';
 import 'add_exercise_screen.dart';
@@ -25,13 +26,13 @@ class _ExercisesContainerState extends State<ExercisesContainer> {
   MuscleGroup? _muscle;
   bool _filtersExpanded = false;
 
-  List<Exercise> get _all => ExercisesScope.of(context).all;
-
-  List<Exercise> get _visible {
-    return _all.where((e) {
-      final byQuery = _q.isEmpty ||
-          e.title.toLowerCase().contains(_q) ||
-          e.description.toLowerCase().contains(_q);
+  List<Exercise> _visibleFromRepo() {
+    final repo = GetIt.I<ExercisesRepository>(); // доступ без context
+    final q = _q;
+    return repo.all.where((e) {
+      final byQuery = q.isEmpty ||
+          e.title.toLowerCase().contains(q) ||
+          e.description.toLowerCase().contains(q);
       final byDiff = _diff.isEmpty || _diff.contains(e.difficulty);
       final byEquip = _equip.isEmpty || _equip.contains(e.equipment);
       final byMuscle = _muscle == null || _muscle == e.muscle;
@@ -40,7 +41,8 @@ class _ExercisesContainerState extends State<ExercisesContainer> {
   }
 
   void _openDetailById(String id) {
-    final ex = ExercisesScope.read(context).byId(id);
+    final repo = GetIt.I<ExercisesRepository>();
+    final ex = repo.byId(id);
     if (ex == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -75,46 +77,55 @@ class _ExercisesContainerState extends State<ExercisesContainer> {
 
   @override
   Widget build(BuildContext context) {
+    final repo = GetIt.I<ExercisesRepository>();
     return Scaffold(
-      body: Stack(
-        children: [
-          ExercisesListScreen(
-            items: _visible,
-            query: _q,
-            selectedDifficulties: _diff,
-            selectedEquipment: _equip,
-            selectedMuscle: _muscle,
-            onSearch: (q) => setState(() => _q = q.trim().toLowerCase()),
-            onToggleDifficulty: (d) => setState(() => _diff.toggle(d)),
-            onToggleEquipment: (e) => setState(() => _equip.toggle(e)),
-            onSelectMuscle: (m) => setState(() => _muscle = m),
-            onAddTap: _openAdd,
-            onDelete: (id) => ExercisesScope.read(context).remove(id),
-            onToggleFavorite: (id) =>
-                ExercisesScope.read(context).toggleFavorite(id),
-            onOpenDetail: _openDetailById,
-            filtersExpanded: _filtersExpanded,
-            onToggleFilters: () =>
-                setState(() => _filtersExpanded = !_filtersExpanded),
-            onOpenFavorites: _openFavorites,
-            onOpenAbout: _openAbout,
-            onOpenGallery: _openGallery,
-          ),
+      body: AnimatedBuilder(
+        animation: repo, // пересобираем при notifyListeners()
+        builder: (context, _) {
+          final items = _visibleFromRepo(); // <- берем напрямую из GetIt
+          return Stack(
+            children: [
+              ExercisesListScreen(
+                items: items,
+                query: _q,
+                selectedDifficulties: _diff,
+                selectedEquipment: _equip,
+                selectedMuscle: _muscle,
 
-          // Мини-бейдж по центру сверху. Не перехватывает клики.
-          IgnorePointer(
-            ignoring: true,
-            child: SafeArea(
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: const ScopeTinyBadge(),
+                onSearch: (q) => setState(() => _q = q.trim().toLowerCase()),
+                onToggleDifficulty: (d) => setState(() => _diff.toggle(d)),
+                onToggleEquipment: (e) => setState(() => _equip.toggle(e)),
+                onSelectMuscle: (m) => setState(() => _muscle = m),
+
+                onAddTap: _openAdd,
+                onDelete: (id) => GetIt.I<ExercisesRepository>().remove(id),
+                onToggleFavorite: (id) => GetIt.I<ExercisesRepository>().toggleFavorite(id),
+                onOpenDetail: _openDetailById,
+
+                filtersExpanded: _filtersExpanded,
+                onToggleFilters: () => setState(() => _filtersExpanded = !_filtersExpanded),
+
+                onOpenFavorites: _openFavorites,
+                onOpenAbout: _openAbout,
+                onOpenGallery: _openGallery,
+              ),
+
+              // Мини-бейдж по центру сверху (не перехватывает клики)
+              const IgnorePointer(
+                ignoring: true,
+                child: SafeArea(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: ScopeTinyBadge(),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
